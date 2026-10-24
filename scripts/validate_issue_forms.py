@@ -8,6 +8,8 @@ import re
 import sys
 from pathlib import Path
 
+from tracks import TRACK_SLUGS
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 TEMPLATE_DIR = REPO_ROOT / ".github" / "ISSUE_TEMPLATE"
 LABELS_FIXTURE = (
@@ -47,6 +49,33 @@ def extract_labels(text: str) -> list[str]:
     return labels
 
 
+def extract_dropdown_options(path: Path, field_id: str) -> tuple[str, ...]:
+    """Return options from one issue form dropdown."""
+    lines = path.read_text(encoding="utf-8").splitlines()
+    field_line = f"    id: {field_id}"
+    try:
+        start = lines.index(field_line)
+    except ValueError:
+        return ()
+
+    options: list[str] = []
+    in_options = False
+    for line in lines[start + 1 :]:
+        if line.startswith("  - type:"):
+            break
+        if line == "      options:":
+            in_options = True
+            continue
+        if in_options:
+            match = re.fullmatch(r"        - ([a-z0-9-]+)", line)
+            if match:
+                options.append(match.group(1))
+                continue
+            if line.strip():
+                break
+    return tuple(options)
+
+
 def validate_form(path: Path, allowed: set[str]) -> list[str]:
     errors: list[str] = []
     text = path.read_text(encoding="utf-8")
@@ -68,6 +97,12 @@ def validate_form(path: Path, allowed: set[str]) -> list[str]:
         ):
             if needle not in text:
                 errors.append(f"{path.name}: missing field {needle}")
+    if path.name == "lab-idea.yml":
+        track_options = extract_dropdown_options(path, "track")
+        if track_options != TRACK_SLUGS:
+            errors.append(
+                f"{path.name}: track options {track_options!r} must match {TRACK_SLUGS!r}"
+            )
     return errors
 
 

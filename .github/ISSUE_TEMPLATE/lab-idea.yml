@@ -26,6 +26,8 @@ body:
         - crypto
         - network
         - osint
+        - forensics
+        - misc
     validations:
       required: true
   - type: dropdown

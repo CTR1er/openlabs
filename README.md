@@ -85,6 +85,8 @@ repository stores only the SHA-256 hash of each flag, never the plaintext.
 | `crypto` | weak primitives, protocol misuse, implementation faults |
 | `network` | protocol abuse, traffic analysis, pivoting |
 | `osint` | recon, source analysis, signature tracing |
+| `forensics` | memory and disk analysis, artifact recovery, anti-forensics |
+| `misc` | constrained environments, escape logic, host-level puzzles |
 
 </div>
 
