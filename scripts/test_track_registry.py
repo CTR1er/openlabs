@@ -101,6 +101,132 @@ def run_issue_form_parity() -> int:
     return 0
 
 
+def run_issue_form_option_parser() -> int:
+    failures = 0
+    with tempfile.TemporaryDirectory(prefix="openlabs-form-opts-") as temp:
+        root = Path(temp)
+
+        quoted = root / "quoted.yml"
+        quoted.write_text(
+            "\n".join(
+                (
+                    "body:",
+                    "  - type: dropdown",
+                    "    id: track",
+                    "    attributes:",
+                    "      label: Track",
+                    "      options:",
+                    '        - "web"',
+                    "        - 'binary'",
+                    "        - crypto",
+                    "        - network",
+                    "        - osint",
+                    '        - "forensics"',
+                    "        - misc",
+                    "",
+                )
+            ),
+            encoding="utf-8",
+        )
+        try:
+            quoted_options = extract_dropdown_options(quoted, "track")
+        except ValueError as exc:
+            failures += 1
+            print(f"track registry: quoted options rejected: {exc}", file=sys.stderr)
+        else:
+            if quoted_options != TRACK_SLUGS:
+                failures += 1
+                print(
+                    "track registry: quoted options "
+                    f"{quoted_options!r} do not match {TRACK_SLUGS!r}",
+                    file=sys.stderr,
+                )
+
+        sneaky = root / "sneaky.yml"
+        sneaky.write_text(
+            "\n".join(
+                (
+                    "body:",
+                    "  - type: dropdown",
+                    "    id: track",
+                    "    attributes:",
+                    "      label: Track",
+                    "      options:",
+                    "        - web",
+                    "        - binary",
+                    "        - crypto",
+                    "        - network",
+                    "        - osint",
+                    "        - forensics",
+                    "        - misc",
+                    '        - "general"',
+                    "",
+                )
+            ),
+            encoding="utf-8",
+        )
+        try:
+            sneaky_options = extract_dropdown_options(sneaky, "track")
+        except ValueError as exc:
+            failures += 1
+            print(
+                f"track registry: quoted general option should parse, got: {exc}",
+                file=sys.stderr,
+            )
+        else:
+            if sneaky_options == TRACK_SLUGS:
+                failures += 1
+                print(
+                    "track registry: quoted general option was silently truncated",
+                    file=sys.stderr,
+                )
+            elif sneaky_options != TRACK_SLUGS + ("general",):
+                failures += 1
+                print(
+                    "track registry: unexpected sneaky options "
+                    f"{sneaky_options!r}",
+                    file=sys.stderr,
+                )
+
+        broken = root / "broken.yml"
+        broken.write_text(
+            "\n".join(
+                (
+                    "body:",
+                    "  - type: dropdown",
+                    "    id: track",
+                    "    attributes:",
+                    "      label: Track",
+                    "      options:",
+                    "        - web",
+                    "        - [not-a-scalar]",
+                    "",
+                )
+            ),
+            encoding="utf-8",
+        )
+        try:
+            extract_dropdown_options(broken, "track")
+        except ValueError as exc:
+            if "unrecognized dropdown option line" not in str(exc):
+                failures += 1
+                print(
+                    f"track registry: broken options raised wrong error: {exc}",
+                    file=sys.stderr,
+                )
+        else:
+            failures += 1
+            print(
+                "track registry: broken option line was accepted",
+                file=sys.stderr,
+            )
+
+    if failures:
+        return 1
+    print("track registry: issue form option parser hardened")
+    return 0
+
+
 def run_new_track_context() -> int:
     failures = 0
     with tempfile.TemporaryDirectory(prefix="openlabs-tracks-") as temp:
@@ -141,6 +267,7 @@ def main() -> int:
         run_python_parity,
         run_site_parity,
         run_issue_form_parity,
+        run_issue_form_option_parser,
         run_new_track_context,
     )
     for step in steps:

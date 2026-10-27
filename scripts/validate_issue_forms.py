@@ -49,8 +49,18 @@ def extract_labels(text: str) -> list[str]:
     return labels
 
 
+OPTION_LINE_RE = re.compile(
+    r"^        - (?:'([^']+)'|\"([^\"]+)\"|([a-z0-9]+(?:-[a-z0-9]+)*))\s*$"
+)
+
+
 def extract_dropdown_options(path: Path, field_id: str) -> tuple[str, ...]:
-    """Return options from one issue form dropdown."""
+    """Return options from one issue form dropdown.
+
+    Accepts bare YAML scalars and single- or double-quoted values. Any other
+    non-empty line inside the options block raises ValueError so parity checks
+    cannot silently truncate the list.
+    """
     lines = path.read_text(encoding="utf-8").splitlines()
     field_line = f"    id: {field_id}"
     try:
@@ -60,19 +70,26 @@ def extract_dropdown_options(path: Path, field_id: str) -> tuple[str, ...]:
 
     options: list[str] = []
     in_options = False
-    for line in lines[start + 1 :]:
+    for index, line in enumerate(lines[start + 1 :], start=start + 2):
         if line.startswith("  - type:"):
             break
         if line == "      options:":
             in_options = True
             continue
-        if in_options:
-            match = re.fullmatch(r"        - ([a-z0-9-]+)", line)
-            if match:
-                options.append(match.group(1))
-                continue
-            if line.strip():
-                break
+        if not in_options:
+            continue
+        if not line.strip():
+            continue
+        if not line.startswith("        - "):
+            # Sibling key such as validations: ends the options list.
+            break
+        match = OPTION_LINE_RE.fullmatch(line)
+        if match is None:
+            raise ValueError(
+                f"{path.name}:{index}: unrecognized dropdown option line "
+                f"in {field_id!r}: {line!r}"
+            )
+        options.append(next(group for group in match.groups() if group is not None))
     return tuple(options)
 
 
